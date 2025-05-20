@@ -1,5 +1,5 @@
 # Use the official Node.js image.
-FROM node:16
+FROM node:20
 
 # Create and change to the app directory.
 WORKDIR /usr/src/app
@@ -14,4 +14,4 @@ RUN npm install --only=production
 COPY . .
 
 # Run the web service on container startup.
-CMD [ "node", "app.js" ]
+CMD [ "node", "start" ]
