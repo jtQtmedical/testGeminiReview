@@ -7,14 +7,63 @@ on:
     branches: [ main ]
 
 jobs:
-  build:
-    runs-on: [ jin]
+  test:
+    runs-on: [self-hosted, Linux, ARM64, jin]
 
     steps:
     - uses: actions/checkout@v2
+    
     - name: Use Node.js
       uses: actions/setup-node@v2
       with:
-        node-version: '16'
-    - run: npm install
-    - run: npm test
+        node-version: '18'
+    
+    - name: Install dependencies
+      run: npm install
+    
+    - name: Start MySQL container
+      run: |
+        # 使用已有的映像啟動 MySQL 容器
+        docker run -d \
+          --name todo-mysql-ci \
+          -e MYSQL_ROOT_PASSWORD=password \
+          -e MYSQL_DATABASE=todo_test_db \
+          -e MYSQL_ROOT_HOST="%" \
+          -p 3306:3306 \
+          mysql:8.0
+        
+        # 等待 MySQL 啟動
+        echo "等待 MySQL 啟動..."
+        sleep 10
+        
+        # 檢查 MySQL 是否準備好接受連接
+        until docker exec todo-mysql-ci mysqladmin ping -h localhost -u root -ppassword --silent; do
+          echo "等待 MySQL 準備就緒..."
+          sleep 2
+        done
+        echo "MySQL 已準備就緒"
+    
+    - name: Setup test data
+      run: npm run setup-test-data
+      env:
+        NODE_ENV: test
+        DB_HOST: localhost
+        DB_USER: root
+        DB_PASSWORD: password
+        DB_NAME: todo_test_db
+    
+    - name: Run tests
+      run: npm test
+      env:
+        NODE_ENV: test
+        DB_HOST: localhost
+        DB_USER: root
+        DB_PASSWORD: password
+        DB_NAME: todo_test_db
+    
+    - name: Cleanup
+      if: always()
+      run: |
+        # 停止並移除測試用的 MySQL 容器
+        docker stop todo-mysql-ci || true
+        docker rm todo-mysql-ci || true
