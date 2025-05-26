@@ -21,58 +21,11 @@ jobs:
     - name: Install dependencies
       run: npm install
     
-    - name: Setup Docker network
-      run: |
-        docker network create todo-test-network || true
-
-    - name: Start MySQL container
-      run: |
-        docker run --rm -d \
-          --name todo-mysql-test \
-          --network todo-test-network \
-          -p 3306:3306 \
-          -e MYSQL_ROOT_PASSWORD=password \
-          -e MYSQL_DATABASE=todo_test_db \
-          -e MYSQL_ROOT_HOST='%' \
-          --platform linux/amd64 \
-          mysql:8.0
-        
-        # 等待 MySQL 啟動
-        echo "等待 MySQL 啟動..."
-        for i in {1..30}; do
-          if docker exec todo-mysql-test mysqladmin ping -h localhost -u root -ppassword --silent; then
-            echo "MySQL 已啟動"
-            break
-          fi
-          echo "等待 MySQL 啟動 ($i/30)..."
-          sleep 2
-        done
-        
-        # 獲取 MySQL 容器 IP
-        MYSQL_IP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' todo-mysql-test)
-        echo "MySQL 容器 IP: $MYSQL_IP"
-        echo "MYSQL_IP=$MYSQL_IP" >> $GITHUB_ENV
-
-    - name: Setup test data
-      run: npm run setup-test-data
-      env:
-        NODE_ENV: test
-        DB_HOST: ${{ env.MYSQL_IP }}
-        DB_USER: root
-        DB_PASSWORD: password
-        DB_NAME: todo_test_db
-    
-    - name: Run tests
-      run: npm test
-      env:
-        NODE_ENV: test
-        DB_HOST: ${{ env.MYSQL_IP }}
-        DB_USER: root
-        DB_PASSWORD: password
-        DB_NAME: todo_test_db
+    - name: Run tests using Docker Compose
+      run: npm run test:docker
     
     - name: Cleanup
       if: always()
       run: |
+        docker-compose -f docker-compose.test.yml down
         docker rm -f todo-mysql-test || true
-        docker network rm todo-test-network || true
