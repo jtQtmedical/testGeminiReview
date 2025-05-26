@@ -10,21 +10,6 @@ jobs:
   test:
     runs-on: [self-hosted, Linux, ARM64]
 
-    services:
-      mysql:
-        image: mysql:8.0
-        env:
-          MYSQL_ROOT_PASSWORD: password
-          MYSQL_DATABASE: todo_test_db
-          MYSQL_ROOT_HOST: "%"
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping -h localhost -u root -ppassword"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=3
-
     steps:
     - uses: actions/checkout@v2
     
@@ -36,12 +21,38 @@ jobs:
     - name: Install dependencies
       run: npm install
     
-    - name: Verify MySQL connection
+    - name: Start MySQL using host Docker
       run: |
-        sudo apt-get update
-        sudo apt-get install -y mysql-client
-        echo "檢查 MySQL 連接..."
-        mysql -h 127.0.0.1 -P 3306 -u root -ppassword -e "SHOW DATABASES;"
+        # 確保沒有已存在的同名容器
+        docker rm -f todo-mysql-test || true
+        
+        # 使用宿主機上已有的映像啟動容器
+        docker run -d \
+          --name todo-mysql-test \
+          --network host \
+          -e MYSQL_ROOT_PASSWORD=password \
+          -e MYSQL_DATABASE=todo_test_db \
+          -e MYSQL_ROOT_HOST="%" \
+          mysql:8.0
+        
+        # 等待 MySQL 啟動
+        echo "等待 MySQL 啟動..."
+        sleep 10
+        
+        # 使用 docker exec 檢查服務是否就緒
+        MAX_RETRY=30
+        COUNTER=0
+        until docker exec todo-mysql-test mysql -uroot -ppassword -e "SELECT 1" >/dev/null 2>&1
+        do
+          COUNTER=$((COUNTER+1))
+          if [ $COUNTER -gt $MAX_RETRY ]; then
+            echo "MySQL 啟動超時，放棄等待"
+            exit 1
+          fi
+          echo "等待 MySQL 準備就緒... ($COUNTER/$MAX_RETRY)"
+          sleep 2
+        done
+        echo "MySQL 已準備就緒"
     
     - name: Setup test data
       run: npm run setup-test-data
@@ -60,3 +71,8 @@ jobs:
         DB_USER: root
         DB_PASSWORD: password
         DB_NAME: todo_test_db
+    
+    - name: Cleanup
+      if: always()
+      run: |
+        docker rm -f todo-mysql-test || true
