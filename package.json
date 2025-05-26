@@ -5,7 +5,7 @@
   "main": "app.js",
   "scripts": {
     "test": "jest --forceExit",
-    "test:docker": "docker-compose -f docker-compose.test.yml up --build --abort-on-container-exit",
+    "test:docker": "docker compose -f docker-compose.test.yml up --build --abort-on-container-exit",
     "start": "node app.js",
     "setup-test-data": "node test/setupTestData.js"
   },
