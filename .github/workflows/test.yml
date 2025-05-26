@@ -34,7 +34,7 @@ jobs:
           -e MYSQL_ROOT_PASSWORD=password \
           -e MYSQL_DATABASE=todo_test_db \
           -e MYSQL_ROOT_HOST="%" \
-          mysql:8.0
+          mysql
         
         # 等待 MySQL 啟動
         echo "等待 MySQL 啟動..."
