@@ -30,6 +30,7 @@ jobs:
         docker run -d \
           --name todo-mysql-test \
           --network host \
+          --platform linux/arm64 \
           -e MYSQL_ROOT_PASSWORD=password \
           -e MYSQL_DATABASE=todo_test_db \
           -e MYSQL_ROOT_HOST="%" \
