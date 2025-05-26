@@ -21,54 +21,43 @@ jobs:
     - name: Install dependencies
       run: npm install
     
-    - name: Create Docker network
+    - name: Setup Docker network
       run: |
         docker network create todo-test-network || true
-    
+
     - name: Start MySQL container
       run: |
-        # 確保沒有已存在的同名容器
-        docker rm -f todo-mysql-test || true
-        
-        # 使用具名網絡啟動 MySQL 容器
-        docker run -d \
+        docker run --rm -d \
           --name todo-mysql-test \
           --network todo-test-network \
-          --platform linux/arm64 \
+          -p 3306:3306 \
           -e MYSQL_ROOT_PASSWORD=password \
           -e MYSQL_DATABASE=todo_test_db \
-          -e MYSQL_ROOT_HOST="%" \
-          mysql:latest
+          -e MYSQL_ROOT_HOST='%' \
+          --platform linux/amd64 \
+          mysql:8.0
         
         # 等待 MySQL 啟動
         echo "等待 MySQL 啟動..."
-        sleep 10
-        
-        # 使用 docker exec 檢查服務是否就緒
-        MAX_RETRY=30
-        COUNTER=0
-        until docker exec todo-mysql-test mysql -uroot -ppassword -e "SELECT 1" >/dev/null 2>&1
-        do
-          COUNTER=$((COUNTER+1))
-          if [ $COUNTER -gt $MAX_RETRY ]; then
-            echo "MySQL 啟動超時，放棄等待"
-            exit 1
+        for i in {1..30}; do
+          if docker exec todo-mysql-test mysqladmin ping -h localhost -u root -ppassword --silent; then
+            echo "MySQL 已啟動"
+            break
           fi
-          echo "等待 MySQL 準備就緒... ($COUNTER/$MAX_RETRY)"
+          echo "等待 MySQL 啟動 ($i/30)..."
           sleep 2
         done
-        echo "MySQL 已準備就緒"
         
-        # 獲取 MySQL 容器 IP 地址
+        # 獲取 MySQL 容器 IP
         MYSQL_IP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' todo-mysql-test)
         echo "MySQL 容器 IP: $MYSQL_IP"
-        echo "MYSQL_HOST=$MYSQL_IP" >> $GITHUB_ENV
-    
+        echo "MYSQL_IP=$MYSQL_IP" >> $GITHUB_ENV
+
     - name: Setup test data
       run: npm run setup-test-data
       env:
         NODE_ENV: test
-        DB_HOST: ${{ env.MYSQL_HOST }}
+        DB_HOST: ${{ env.MYSQL_IP }}
         DB_USER: root
         DB_PASSWORD: password
         DB_NAME: todo_test_db
@@ -77,7 +66,7 @@ jobs:
       run: npm test
       env:
         NODE_ENV: test
-        DB_HOST: ${{ env.MYSQL_HOST }}
+        DB_HOST: ${{ env.MYSQL_IP }}
         DB_USER: root
         DB_PASSWORD: password
         DB_NAME: todo_test_db
