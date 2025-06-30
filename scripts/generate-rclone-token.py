@@ -48,11 +48,24 @@ def main():
         # 壓縮 JSON（移除空格和換行）
         compressed_json = json.dumps(service_account_data, separators=(',', ':'))
         
+        # 驗證壓縮後的 JSON 能否重新解析
+        try:
+            json.loads(compressed_json)
+            print("✅ JSON 壓縮和驗證成功")
+        except json.JSONDecodeError as e:
+            print(f"❌ JSON 壓縮後驗證失敗: {e}")
+            sys.exit(1)
+        
         # 產生 rclone 配置
         rclone_config = f"""[gdrive]
 type = drive
 scope = drive.file
 service_account_credentials = {compressed_json}"""
+        
+        # 驗證生成的 rclone 配置
+        if not rclone_config.startswith('[gdrive]'):
+            print("❌ rclone 配置格式錯誤")
+            sys.exit(1)
         
         print("\n" + "=" * 50)
         print("🎯 GitHub Secret 設定")
