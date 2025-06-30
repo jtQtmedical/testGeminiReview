@@ -22,12 +22,13 @@ jobs:
           script: |
             const pr = context.payload.pull_request;
             const branch = pr.head.ref;                  // PR 分支名稱
-            const filename = `${branch}.md`;             // 例如 feature/foo.md
-            const header = `# PR #${pr.number} - ${pr.title}\n\n`;
+            const safeBranch = branch.replace(/[\/:]/, '-'); // 替換特殊字元
+            const filename = `${safeBranch}.md`;         // 安全的檔案名稱
+            const header = `# PR #${pr.number} - ${pr.title}\n\n**分支**: ${branch}\n\n`;
             const body   = pr.body || "_(no description)_";
             const fs = require('fs');
             fs.writeFileSync(filename, header + body + "\n");
-            core.info(`Generated ${filename}`);
+            core.info(`Generated ${filename} for branch ${branch}`);
 
       # 3. 安裝 rclone（手動安裝避免權限問題）
       - name: Install rclone
@@ -69,8 +70,11 @@ jobs:
           echo "上傳分支: $BRANCH"
           echo "安全檔名: ${SAFE_BRANCH}.md"
           
-          # 確保目標資料夾存在（如果不存在會自動建立）
-          ~/bin/rclone copy "${BRANCH}.md" "gdrive:GitHub-PR-Descriptions/" --create-dest-dirs
+          # 先確保目標資料夾存在
+          ~/bin/rclone mkdir "gdrive:GitHub-PR-Descriptions" || echo "資料夾可能已存在"
+          
+          # 上傳檔案到 Google Drive（使用安全檔名）
+          ~/bin/rclone copy "${SAFE_BRANCH}.md" "gdrive:GitHub-PR-Descriptions/"
           
           echo "✅ 檔案已上傳到 Google Drive"
 
@@ -78,5 +82,7 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          rm -f "${{ github.event.pull_request.head.ref }}.md"
+          BRANCH="${{ github.event.pull_request.head.ref }}"
+          SAFE_BRANCH=$(echo "$BRANCH" | sed 's/[\/:]/-/g')
+          rm -f "${SAFE_BRANCH}.md"
           rm -f ~/.config/rclone/rclone.conf 
