@@ -1,0 +1,68 @@
+name: Save PR Description to Google Drive
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+jobs:
+  upload-pr-desc:
+    runs-on: ubuntu-latest
+    steps:
+      # 1. Checkout 並保留推送權限
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      # 2. 讀取 PR body，寫成 markdown 檔案
+      - name: Generate PR description file
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pr = context.payload.pull_request;
+            const branch = pr.head.ref;                  // PR 分支名稱
+            const filename = `${branch}.md`;             // 例如 feature/foo.md
+            const header = `# PR #${pr.number} - ${pr.title}\n\n`;
+            const body   = pr.body || "_(no description)_";
+            const fs = require('fs');
+            fs.writeFileSync(filename, header + body + "\n");
+            core.info(`Generated ${filename}`);
+
+      # 3. 安裝 rclone（用它上傳到 Drive）
+      - name: Install rclone
+        run: curl https://rclone.org/install.sh | bash
+
+      # 4. 配置 rclone remote（直接使用完整的配置）
+      - name: Configure rclone
+        run: |
+          mkdir -p ~/.config/rclone
+          echo "${{ secrets.RCLONE_TOKEN }}" > ~/.config/rclone/rclone.conf
+
+      # 5. 驗證配置並測試連接
+      - name: Test rclone connection
+        run: |
+          echo "測試 rclone 配置..."
+          rclone config show gdrive
+          echo "測試 Google Drive 連接..."
+          rclone ls gdrive: | head -5 || echo "無法列出根目錄，但可能仍可上傳到指定資料夾"
+
+      # 6. 上傳到 Google Drive 指定資料夾
+      - name: Upload to Google Drive
+        run: |
+          BRANCH="${{ github.event.pull_request.head.ref }}"
+          SAFE_BRANCH=$(echo "$BRANCH" | sed 's/[\/:]/-/g')
+          echo "上傳分支: $BRANCH"
+          echo "安全檔名: ${SAFE_BRANCH}.md"
+          
+          # 確保目標資料夾存在（如果不存在會自動建立）
+          rclone copy "${BRANCH}.md" "gdrive:GitHub-PR-Descriptions/" --create-dest-dirs
+          
+          echo "✅ 檔案已上傳到 Google Drive"
+
+      # 7. 清理工作目錄
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -f "${{ github.event.pull_request.head.ref }}.md"
+          rm -f ~/.config/rclone/rclone.conf 
