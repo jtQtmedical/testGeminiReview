@@ -52,15 +52,46 @@ jobs:
       - name: Configure rclone
         run: |
           mkdir -p ~/.config/rclone
+          
+          # 檢查 RCLONE_TOKEN 是否存在
+          if [ -z "${{ secrets.RCLONE_TOKEN }}" ]; then
+            echo "❌ RCLONE_TOKEN Secret 未設定"
+            echo "請在 GitHub repository → Settings → Secrets and variables → Actions 中設定 RCLONE_TOKEN"
+            exit 1
+          fi
+          
+          # 寫入配置檔案
           echo "${{ secrets.RCLONE_TOKEN }}" > ~/.config/rclone/rclone.conf
+          
+          # 檢查配置檔案是否正確寫入
+          echo "📋 檢查 rclone 配置檔案..."
+          if [ ! -f ~/.config/rclone/rclone.conf ]; then
+            echo "❌ 配置檔案建立失敗"
+            exit 1
+          fi
+          
+          echo "✅ 配置檔案已建立"
+          echo "檔案大小: $(wc -c < ~/.config/rclone/rclone.conf) bytes"
 
       # 5. 驗證配置並測試連接
       - name: Test rclone connection
         run: |
-          echo "測試 rclone 配置..."
-          ~/bin/rclone config show gdrive
-          echo "測試 Google Drive 連接..."
-          ~/bin/rclone ls gdrive: | head -5 || echo "無法列出根目錄，但可能仍可上傳到指定資料夾"
+          echo "🔍 檢查所有可用的 rclone remotes..."
+          ~/bin/rclone listremotes
+          
+          echo ""
+          echo "📋 顯示 gdrive 配置..."
+          ~/bin/rclone config show gdrive || {
+            echo "❌ 找不到 gdrive 配置"
+            echo ""
+            echo "🔧 完整配置檔案內容:"
+            cat ~/.config/rclone/rclone.conf | sed 's/private_key.*"/private_key":"[REDACTED]"/g'
+            exit 1
+          }
+          
+          echo ""
+          echo "🧪 測試 Google Drive 連接..."
+          ~/bin/rclone ls gdrive: | head -5 || echo "⚠️ 無法列出根目錄，但可能仍可上傳到指定資料夾"
 
       # 6. 上傳到 Google Drive 指定資料夾
       - name: Upload to Google Drive
