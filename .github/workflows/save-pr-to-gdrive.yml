@@ -29,9 +29,23 @@ jobs:
             fs.writeFileSync(filename, header + body + "\n");
             core.info(`Generated ${filename}`);
 
-      # 3. 安裝 rclone（用它上傳到 Drive）
+      # 3. 安裝 rclone（手動安裝避免權限問題）
       - name: Install rclone
-        run: curl https://rclone.org/install.sh | bash
+        run: |
+          # 下載 rclone
+          curl -O https://downloads.rclone.org/rclone-current-linux-amd64.zip
+          unzip rclone-current-linux-amd64.zip
+          
+          # 複製到本地 bin 目錄
+          mkdir -p ~/bin
+          cp rclone-*/rclone ~/bin/
+          chmod +x ~/bin/rclone
+          
+          # 加入到 PATH
+          echo "$HOME/bin" >> $GITHUB_PATH
+          
+          # 驗證安裝
+          ~/bin/rclone version
 
       # 4. 配置 rclone remote（直接使用完整的配置）
       - name: Configure rclone
@@ -43,9 +57,9 @@ jobs:
       - name: Test rclone connection
         run: |
           echo "測試 rclone 配置..."
-          rclone config show gdrive
+          ~/bin/rclone config show gdrive
           echo "測試 Google Drive 連接..."
-          rclone ls gdrive: | head -5 || echo "無法列出根目錄，但可能仍可上傳到指定資料夾"
+          ~/bin/rclone ls gdrive: | head -5 || echo "無法列出根目錄，但可能仍可上傳到指定資料夾"
 
       # 6. 上傳到 Google Drive 指定資料夾
       - name: Upload to Google Drive
@@ -56,7 +70,7 @@ jobs:
           echo "安全檔名: ${SAFE_BRANCH}.md"
           
           # 確保目標資料夾存在（如果不存在會自動建立）
-          rclone copy "${BRANCH}.md" "gdrive:GitHub-PR-Descriptions/" --create-dest-dirs
+          ~/bin/rclone copy "${BRANCH}.md" "gdrive:GitHub-PR-Descriptions/" --create-dest-dirs
           
           echo "✅ 檔案已上傳到 Google Drive"
 
