@@ -31,7 +31,9 @@ app.get('/', (req, res) => {
 
 app.get('/todos', async (req, res) => {
   try {
-    const todos = await db.Todo.findAll();
+    const todos = await db.Todo.findAll({
+      order: [['createdAt', 'DESC']] // 按建立時間倒序排列
+    });
     res.json(todos);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -40,10 +42,44 @@ app.get('/todos', async (req, res) => {
 
 app.post('/todos', async (req, res) => {
   try {
-    const todo = await db.Todo.create(req.body);
-    res.status(201).json(todo);
+    const { title, description = '', completed = false } = req.body;
+    
+    // 驗證必要欄位
+    if (!title || title.trim() === '') {
+      return res.status(400).json({ 
+        error: '標題是必填欄位',
+        field: 'title'
+      });
+    }
+
+    const todoData = {
+      title: title.trim(),
+      description: description.trim(),
+      completed: Boolean(completed)
+    };
+
+    // 如果建立時就是完成狀態，設定完成時間
+    if (todoData.completed) {
+      todoData.completedAt = new Date();
+    }
+
+    const todo = await db.Todo.create(todoData);
+    res.status(201).json({
+      success: true,
+      message: '待辦事項已成功新增',
+      data: todo
+    });
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    if (error.name === 'SequelizeValidationError') {
+      return res.status(400).json({ 
+        error: '驗證失敗',
+        details: error.errors.map(e => e.message)
+      });
+    }
+    res.status(500).json({ 
+      error: '伺服器內部錯誤',
+      details: error.message 
+    });
   }
 });
 
@@ -53,7 +89,7 @@ app.get('/todos/:id', async (req, res) => {
     if (todo) {
       res.json(todo);
     } else {
-      res.status(404).json({ error: 'Todo not found' });
+      res.status(404).json({ error: '找不到指定的待辦事項' });
     }
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -63,14 +99,53 @@ app.get('/todos/:id', async (req, res) => {
 app.put('/todos/:id', async (req, res) => {
   try {
     const todo = await db.Todo.findByPk(req.params.id);
-    if (todo) {
-      await todo.update(req.body);
-      res.json(todo);
-    } else {
-      res.status(404).json({ error: 'Todo not found' });
+    if (!todo) {
+      return res.status(404).json({ 
+        error: '找不到指定的待辦事項',
+        id: req.params.id
+      });
     }
+
+    const { title, description, completed } = req.body;
+    const updateData = {};
+
+    // 只更新提供的欄位
+    if (title !== undefined) {
+      if (!title || title.trim() === '') {
+        return res.status(400).json({ 
+          error: '標題不能為空',
+          field: 'title'
+        });
+      }
+      updateData.title = title.trim();
+    }
+
+    if (description !== undefined) {
+      updateData.description = description.trim();
+    }
+
+    if (completed !== undefined) {
+      updateData.completed = Boolean(completed);
+    }
+
+    await todo.update(updateData);
+    
+    res.json({
+      success: true,
+      message: '待辦事項已成功更新',
+      data: todo
+    });
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    if (error.name === 'SequelizeValidationError') {
+      return res.status(400).json({ 
+        error: '驗證失敗',
+        details: error.errors.map(e => e.message)
+      });
+    }
+    res.status(500).json({ 
+      error: '伺服器內部錯誤',
+      details: error.message 
+    });
   }
 });
 
