@@ -1,0 +1,40 @@
+version: "3.8"
+
+services:
+  test:
+    build: .
+    container_name: todo-test
+    volumes:
+      - .:/usr/src/app
+    command: >
+      sh -c "
+        echo '等待MySQL啟動...' &&
+        while ! nc -z mysql 3306; do
+          sleep 1
+        done &&
+        echo 'MySQL已啟動' &&
+        npm test
+      "
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      - NODE_ENV=test
+      - DB_HOST=mysql
+      - DB_USER=root
+      - DB_PASSWORD=password
+      - DB_NAME=todo_test_db
+
+  mysql:
+    image: mysql:8.0
+    container_name: todo-mysql-test
+    platform: linux/amd64
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: todo_test_db
+      MYSQL_ROOT_HOST: "%"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$$MYSQL_ROOT_PASSWORD"]
+      interval: 5s
+      timeout: 3s
+      retries: 5 
