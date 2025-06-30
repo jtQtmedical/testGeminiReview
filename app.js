@@ -1,7 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const app = express();
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 3001;
 const db = require('./models');
 
 // 設置 middleware 來解析 JSON
