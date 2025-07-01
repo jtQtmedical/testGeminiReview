@@ -1,5 +1,36 @@
-node_modules
-.env
+# Dependency directories
+node_modules/
+npm-debug.log*
+
+# OS generated files
 .DS_Store
-npm-debug.log
-coverage/
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Service Account credentials (NEVER commit these!)
+*.json
+*-service-account*.json
+*-credentials*.json
+service-account*.json
+
+# rclone config files
+rclone.conf
+rclone-config.txt
+
+# Test files
+test-*.md
+
+.env
