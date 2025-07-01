@@ -1,4 +1,5 @@
-name: Save PR Description to Google Drive
+# .github/workflows/pr-to-gdrive-sa.yml
+name: Save PR Description with Service Account
 
 on:
   pull_request:
@@ -8,112 +9,26 @@ jobs:
   upload-pr-desc:
     runs-on: ubuntu-latest
     steps:
-      # 1. Checkout 並保留推送權限
-      - name: Checkout repo
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          persist-credentials: true
 
-      # 2. 讀取 PR body，寫成 markdown 檔案
       - name: Generate PR description file
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const pr = context.payload.pull_request;
-            const branch = pr.head.ref;                  // PR 分支名稱
-            const safeBranch = branch.replace(/[\/:]/, '-'); // 替換特殊字元
-            const filename = `${safeBranch}.md`;         // 安全的檔案名稱
-            const header = `# PR #${pr.number} - ${pr.title}\n\n**分支**: ${branch}\n\n`;
-            const body   = pr.body || "_(no description)_";
-            const fs = require('fs');
-            fs.writeFileSync(filename, header + body + "\n");
-            core.info(`Generated ${filename} for branch ${branch}`);
+            const pr     = context.payload.pull_request;
+            const branch = pr.head.ref;
+            const file   = `${branch}.md`;
+            require('fs').writeFileSync(
+              file,
+              `# PR #${pr.number} – ${pr.title}\n\n${pr.body||"_no description_"}\n`
+            );
+            core.info(`Generated ${file}`);
 
-      # 3. 安裝 rclone（手動安裝避免權限問題）
-      - name: Install rclone
-        run: |
-          # 下載 rclone
-          curl -O https://downloads.rclone.org/rclone-current-linux-amd64.zip
-          unzip rclone-current-linux-amd64.zip
-          
-          # 複製到本地 bin 目錄
-          mkdir -p ~/bin
-          cp rclone-*/rclone ~/bin/
-          chmod +x ~/bin/rclone
-          
-          # 加入到 PATH
-          echo "$HOME/bin" >> $GITHUB_PATH
-          
-          # 驗證安裝
-          ~/bin/rclone version
-
-      # 4. 配置 rclone remote（直接使用完整的配置）
-      - name: Configure rclone
-        run: |
-          mkdir -p ~/.config/rclone
-          
-          # 檢查 RCLONE_TOKEN 是否存在
-          if [ -z "${{ secrets.RCLONE_TOKEN }}" ]; then
-            echo "❌ RCLONE_TOKEN Secret 未設定"
-            echo "請在 GitHub repository → Settings → Secrets and variables → Actions 中設定 RCLONE_TOKEN"
-            exit 1
-          fi
-          
-          # 寫入配置檔案
-          echo "${{ secrets.RCLONE_TOKEN }}" > ~/.config/rclone/rclone.conf
-          
-          # 檢查配置檔案是否正確寫入
-          echo "📋 檢查 rclone 配置檔案..."
-          if [ ! -f ~/.config/rclone/rclone.conf ]; then
-            echo "❌ 配置檔案建立失敗"
-            exit 1
-          fi
-          
-          echo "✅ 配置檔案已建立"
-          echo "檔案大小: $(wc -c < ~/.config/rclone/rclone.conf) bytes"
-
-      # 5. 驗證配置並測試連接
-      - name: Test rclone connection
-        run: |
-          echo "🔍 檢查所有可用的 rclone remotes..."
-          ~/bin/rclone listremotes
-          
-          echo ""
-          echo "📋 顯示 gdrive 配置..."
-          ~/bin/rclone config show gdrive || {
-            echo "❌ 找不到 gdrive 配置"
-            echo ""
-            echo "🔧 完整配置檔案內容:"
-            cat ~/.config/rclone/rclone.conf | sed 's/private_key.*"/private_key":"[REDACTED]"/g'
-            exit 1
-          }
-          
-          echo ""
-          echo "🧪 測試 Google Drive 連接..."
-          ~/bin/rclone ls gdrive: | head -5 || echo "⚠️ 無法列出根目錄，但可能仍可上傳到指定資料夾"
-
-      # 6. 上傳到 Google Drive 指定資料夾
-      - name: Upload to Google Drive
-        run: |
-          BRANCH="${{ github.event.pull_request.head.ref }}"
-          SAFE_BRANCH=$(echo "$BRANCH" | sed 's/[\/:]/-/g')
-          echo "上傳分支: $BRANCH"
-          echo "安全檔名: ${SAFE_BRANCH}.md"
-          
-          # 先確保目標資料夾存在
-          ~/bin/rclone mkdir "gdrive:GitHub-PR-Descriptions" || echo "資料夾可能已存在"
-          
-          # 上傳檔案到 Google Drive（使用安全檔名）
-          ~/bin/rclone copy "${SAFE_BRANCH}.md" "gdrive:GitHub-PR-Descriptions/"
-          
-          echo "✅ 檔案已上傳到 Google Drive"
-
-      # 7. 清理工作目錄
-      - name: Cleanup
-        if: always()
-        run: |
-          BRANCH="${{ github.event.pull_request.head.ref }}"
-          SAFE_BRANCH=$(echo "$BRANCH" | sed 's/[\/:]/-/g')
-          rm -f "${SAFE_BRANCH}.md"
-          rm -f ~/.config/rclone/rclone.conf 
+      - name: Upload to Google Drive via Service Account
+        uses: willo32/google-drive-upload-action@v1
+        with:
+          credentials: ${{ secrets.GDRIVE_SA_JSON }}   # 整份 Service Account JSON
+          target:      ${{ github.event.pull_request.head.ref }}.md
+          parent_folder_id: ${{ secrets.GDRIVE_FOLDER_ID }}  # 目的資料夾的 ID
