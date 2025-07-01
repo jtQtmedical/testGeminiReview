@@ -29,6 +29,6 @@ jobs:
       - name: Upload to Google Drive via Service Account
         uses: willo32/google-drive-upload-action@v1
         with:
-          credentials: ${{ secrets.GDRIVE_SA_JSON }}   # 整份 Service Account JSON
+          credentials: ${{ secrets.GDRIVE_SA_BASE64 }}   # base64 編碼的服務帳戶 JSON
           target:      ${{ github.event.pull_request.head.ref }}.md
           parent_folder_id: ${{ secrets.GDRIVE_FOLDER_ID }}  # 目的資料夾的 ID
