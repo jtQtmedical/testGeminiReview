@@ -1,0 +1,36 @@
+# .github/workflows/pr-to-gdrive-sa.yml
+name: Save PR Description with Service Account
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+jobs:
+  upload-pr-desc:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Generate PR description file
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pr     = context.payload.pull_request;
+            const branch = pr.head.ref;
+            const file   = `${branch}.md`;
+            require('fs').writeFileSync(
+              file,
+              `# PR #${pr.number} – ${pr.title}\n\n${pr.body||"_no description_"}\n`
+            );
+            core.info(`Generated ${file}`);
+
+      - name: Upload to Google Drive with Auto Folder Creation
+        uses: Jumbo810/Upload_Github_Artifacts_TO_GDrive@v2.3.1
+        with:
+          credentials: ${{ secrets.GDRIVE_SA_JSON }}   # 整份 Service Account JSON (base64 編碼)
+          target: ${{ github.event.pull_request.head.ref }}.md
+          parent_folder_id: ${{ secrets.GDRIVE_FOLDER_ID }}  # 根目錄資料夾的 ID
+          child_folder: "PR-${{ github.event.pull_request.number }}"  # 自動建立以 PR 編號命名的子資料夾
+          name: "${{ github.event.pull_request.head.ref }}-pr-${{ github.event.pull_request.number }}.md"  # 自訂檔案名稱

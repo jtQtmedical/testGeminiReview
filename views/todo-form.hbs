@@ -1,0 +1,52 @@
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                <h3 class="card-title mb-0">
+                    <i class="fas {{#if isEdit}}fa-edit{{else}}fa-plus{{/if}} me-2"></i>
+                    {{#if isEdit}}編輯待辦事項{{else}}新增待辦事項{{/if}}
+                </h3>
+            </div>
+            <div class="card-body">
+                <form action="{{action}}" method="POST" onsubmit="handleSubmit(event, '{{method}}')">
+                    <div class="mb-3">
+                        <label for="title" class="form-label">標題 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="title" name="title" 
+                               value="{{#if todo}}{{todo.title}}{{/if}}" required>
+                        <div class="form-text">請輸入待辦事項的標題</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="description" class="form-label">描述</label>
+                        <textarea class="form-control" id="description" name="description" rows="3" 
+                                  placeholder="選填：詳細描述這個待辦事項">{{#if todo}}{{todo.description}}{{/if}}</textarea>
+                    </div>
+
+                    {{#if isEdit}}
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="completed" name="completed" 
+                                       {{#if todo.completed}}checked{{/if}} value="true">
+                                <label class="form-check-label" for="completed">
+                                    <i class="fas fa-check-circle me-1"></i>
+                                    已完成
+                                </label>
+                            </div>
+                        </div>
+                    {{/if}}
+
+                    <div class="d-flex justify-content-between">
+                        <a href="/todos" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left me-1"></i>
+                            返回列表
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas {{#if isEdit}}fa-save{{else}}fa-plus{{/if}} me-1"></i>
+                            {{#if isEdit}}儲存變更{{else}}建立待辦事項{{/if}}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div> 

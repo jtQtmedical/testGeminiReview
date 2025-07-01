@@ -6,6 +6,10 @@ module.exports = (sequelize) => {
       type: DataTypes.STRING,
       allowNull: false
     },
+    description: {
+      type: DataTypes.TEXT,
+      allowNull: true
+    },
     completed: {
       type: DataTypes.BOOLEAN,
       defaultValue: false
