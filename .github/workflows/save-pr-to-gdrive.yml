@@ -1,0 +1,34 @@
+# .github/workflows/pr-to-gdrive-sa.yml
+name: Save PR Description with Service Account
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+jobs:
+  upload-pr-desc:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Generate PR description file
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pr     = context.payload.pull_request;
+            const branch = pr.head.ref;
+            const file   = `${branch}.md`;
+            require('fs').writeFileSync(
+              file,
+              `# PR #${pr.number} – ${pr.title}\n\n${pr.body||"_no description_"}\n`
+            );
+            core.info(`Generated ${file}`);
+
+      - name: Upload to Google Drive via Service Account
+        uses: willo32/google-drive-upload-action@v1
+        with:
+          credentials: ${{ secrets.GDRIVE_SA_JSON }}   # 整份 Service Account JSON
+          target:      ${{ github.event.pull_request.head.ref }}.md
+          parent_folder_id: ${{ secrets.GDRIVE_FOLDER_ID }}  # 目的資料夾的 ID
